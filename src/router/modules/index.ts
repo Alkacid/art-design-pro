@@ -10,11 +10,14 @@ import { exceptionRoutes } from './exception'
 import { safeguardRoutes } from './safeguard'
 import { helpRoutes } from './help'
 
+import { healthRoutes } from './health'
+
 /**
  * 导出所有模块化路由
  */
 export const routeModules: AppRouteRecord[] = [
   dashboardRoutes,
+  healthRoutes,
   templateRoutes,
   widgetsRoutes,
   examplesRoutes,

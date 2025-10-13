@@ -1,0 +1,149 @@
+\subsection{20250930: 减肥计划}
+\textbf{开源模板:}
+\begin{itemize}
+    \item \href{https://github.com/Daymychen/art-design-pro}{Art Design Pro}
+    \item \href{https://link.juejin.cn/?target=https%3A%2F%2Fgithub.com%2Fsoybeanjs%2Fsoybean-admin}{SoybeanAdmin}
+\end{itemize}
+\subsubsection{前端界面： 分开患者和医生的界面}
+\textbf{患者界面：}
+\begin{itemize}
+    \item 第一次建立账号需要医生辅助完成，需要患者实地就医，接受医生面诊，记录检查专业的身体情况、病因、肥胖的严重程度等
+    \item 类似于问卷的、点击式、固定选项的界面，引导患者填写病史、减肥经历及反弹情况; 问题树的选项配置可以由医生或管理员自定义; 
+    \item 首页需要有教育警示页面，类似肥胖的后果等;
+    \item 患者每日饮食记录，可以识别食物图片，计算热量并记录; 识别热量尽可能简单，不需要秤等复杂工具; 最好固定患者常用的餐具;
+    \item 患者的身体状态记录，可以上传体重、体脂、血糖、血压等，有健康评估指标，可以监测变化和异常;
+    还需要有患者的减重目标，多长时间内减重多少
+    \item 根据患者当前的状态和就医记录，AI规划近期时间的饮食、运动减肥计划以及就医计划（多久看一次医生）;  推荐的食物要方便烹饪、符合地方口味，分量要容易度量; 运动计划应细化到每日项目（如周一晨走30分钟）而非笼统时长要求;
+\end{itemize}
+
+\textbf{医生界面:}
+\begin{itemize}
+    \item 对于患者的信息更加专业和详细，包括检查、化验的结果等等; 可以查看患者的身体健康摘要、就诊历史、生成待检查项目等等
+    \item 可以分类、分群管理（比如按严重程度、患者归属等）; 患者可以在群内交流
+    \item 患者列表支持筛选排序（通过BMI、病症等），可以自动报告异常的患者情况、自动提醒需要就医复诊的患者名单
+\end{itemize}
+
+\subsubsection{需求分析与模块拆分}
+\begin{enumerate}
+    \item 确认医生端、患者端的核心功能优先级。
+    \item 将功能按「必须」「重要」「可选」三层划分，避免一上来做太复杂。
+    \item 输出成果：功能优先级文档、系统用例图、模块划分图。
+\end{enumerate}
+\begin{enumerate}
+
+
+    \item \textbf{数据库设计（第一轮：核心表）}
+    \begin{enumerate}
+        \item \textbf{设计核心实体：}
+        \begin{itemize}
+            \item 用户（users）
+            \item 患者档案（patients）
+            \item 医生信息（doctors）
+            \item 就诊记录（visits）
+            \item 体征记录（vitals）
+            \item 饮食记录（meal\_entries）
+        \end{itemize}
+        \item \textbf{关系的明确：}
+        \begin{itemize}
+            \item 用户表和患者/医生表的对应关系；
+            \item 患者和医生通过就诊记录建立联系；
+            \item 患者的日常记录归属于患者档案。
+        \end{itemize}
+        \item 保持简洁：不要一开始就建太多表，先保证核心数据能跑起来。
+        \item 输出成果：数据库 ER 图 + 初始建表 SQL。
+    \end{enumerate}
+
+    \item \textbf{数据库设计（第二轮：扩展表）}
+    \begin{enumerate}
+        \item 加入问卷（questionnaire\_templates, responses）、食物库（food\_items）、AI 生成的计划（care\_plans）、通知提醒（notifications）。
+        \item 增加审计日志（audit\_logs）和群组管理（groups）。
+        \item 输出成果：完整 ER 图 + 数据字典。
+    \end{enumerate}
+
+    \item \textbf{后端框架设计（骨架阶段）}
+    \begin{enumerate}
+        \item 先不实现复杂功能，只写\textbf{路由框架}：
+        \begin{itemize}
+            \item \texttt{/auth/*}：登录注册（基础鉴权）。
+            \item \texttt{/patients/*}：CRUD 患者档案。
+            \item \texttt{/doctors/*}：医生查询患者。
+            \item \texttt{/vitals/*}：提交体征数据。
+        \end{itemize}
+        \item 保证 API 能与数据库交互，写基础的增删改查。
+        \item 输出成果：后端骨架代码 + OpenAPI 文档。
+    \end{enumerate}
+
+    \item \textbf{前后端联调（第一轮：最小功能）}
+    \begin{enumerate}
+        \item 患者端：
+        \begin{itemize}
+            \item 登录、建档（医生协助）、提交体重/血压记录；
+            \item 查看教育内容（静态）。
+        \end{itemize}
+        \item 医生端：
+        \begin{itemize}
+            \item 登录、查看患者列表、基本病历。
+        \end{itemize}
+        \item 目标：系统能跑通最小闭环（医生创建患者 → 患者上传数据 → 医生查看）。
+    \end{enumerate}
+
+    \item \textbf{后端功能扩展（第二轮）}
+    \begin{enumerate}
+        \item 增加问卷系统（患者填写病史 → 存储 → 医生查看）。
+        \item 增加饮食记录：
+        \begin{itemize}
+            \item 第一版：手工输入食物 + 热量；
+            \item 第二版：上传食物照片，后台异步处理（先可 mock AI）。
+        \end{itemize}
+        \item 增加通知提醒：每天定时提醒患者上传数据。
+        \item 输出成果：更多 API + 前端页面联通。
+    \end{enumerate}
+
+    \item \textbf{AI / 智能模块接入}
+    \begin{enumerate}
+        \item 饮食计划生成：患者的目标 + 当前状态 → 生成 1 周的饮食/运动建议。
+        \item 医生端审批流程：AI 生成计划 → 医生修改 → 发布。
+        \item 食物识别：接入 AI 或第三方 API，返回食物候选 + 热量估算。
+        \item 输出成果：AI 模块与主后端交互的接口。
+    \end{enumerate}
+
+    \item \textbf{合规与安全加固}
+    \begin{enumerate}
+        \item 增加日志、数据加密、访问权限控制。
+        \item 加入审计日志，满足医疗数据合规要求。
+        \item 提供数据导出与删除功能。
+    \end{enumerate}
+
+    \item \textbf{前端功能完善与体验优化}
+    \begin{enumerate}
+        \item 患者端：饮食记录更智能，体征趋势图，教育内容更丰富。
+        \item 医生端：筛选患者、分组管理、异常提醒、患者群组交流。
+        \item 增加 Dashboard，提供关键指标可视化。
+    \end{enumerate}
+
+    \item \textbf{测试与上线}
+    \begin{enumerate}
+        \item 单元测试、接口测试、端到端测试。
+        \item 演练场景：
+        \begin{itemize}
+            \item 新患者建档；
+            \item 患者连续 1 周记录饮食；
+            \item AI 自动生成计划并由医生审核；
+            \item 异常提醒触发。
+        \end{itemize}
+        \item 部署到测试环境，医生和患者进行试用反馈，再上线生产。
+    \end{enumerate}
+
+    \item \textbf{总结 – 推荐执行顺序}
+    \begin{enumerate}
+        \item 明确功能优先级；
+        \item 设计核心数据库表（用户/患者/就诊/体征/饮食）；
+        \item 后端写最小 API 框架；
+        \item 前端接入，跑通最小闭环；
+        \item 第二轮扩展表（问卷/计划/通知）+ 后端功能；
+        \item AI 与食物识别模块接入；
+        \item 安全与合规加固；
+        \item 前端完整化，优化用户体验；
+        \item 测试与上线。
+    \end{enumerate}
+\end{enumerate}
