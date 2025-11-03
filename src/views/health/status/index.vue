@@ -15,56 +15,26 @@
           </ElRadioGroup>
         </div>
 
+        <!-- 动态统计信息（基于配置） -->
         <ElRow :gutter="20" class="stats-content">
-          <ElCol :xs="12" :sm="6">
+          <ElCol v-for="metric in statisticsMetrics" :key="metric.key" :xs="12" :sm="6">
             <div class="stat-item">
-              <div class="stat-label">平均体重</div>
+              <div class="stat-label">平均{{ metric.label }}</div>
               <div class="stat-value">
-                {{ statistics.avgWeight ? statistics.avgWeight.toFixed(1) : '--' }}
-                <span class="unit">kg</span>
+                {{ getStatValue(metric.key) }}
+                <span class="unit">{{ metric.unit }}</span>
               </div>
+              <!-- 显示趋势（如果有） -->
               <div
-                v-if="statistics.weightTrend"
+                v-if="getTrendValue(metric.key) !== null"
                 class="stat-trend"
                 :class="{
-                  positive: statistics.weightTrend > 0,
-                  negative: statistics.weightTrend < 0
+                  positive: getTrendValue(metric.key)! > 0,
+                  negative: getTrendValue(metric.key)! < 0
                 }"
               >
-                {{ statistics.weightTrend > 0 ? '+' : '' }}{{ statistics.weightTrend.toFixed(1) }}kg
-              </div>
-            </div>
-          </ElCol>
-          <ElCol :xs="12" :sm="6">
-            <div class="stat-item">
-              <div class="stat-label">平均收缩压</div>
-              <div class="stat-value">
-                {{
-                  statistics.avgSystolicPressure ? statistics.avgSystolicPressure.toFixed(0) : '--'
-                }}
-                <span class="unit">mmHg</span>
-              </div>
-            </div>
-          </ElCol>
-          <ElCol :xs="12" :sm="6">
-            <div class="stat-item">
-              <div class="stat-label">平均舒张压</div>
-              <div class="stat-value">
-                {{
-                  statistics.avgDiastolicPressure
-                    ? statistics.avgDiastolicPressure.toFixed(0)
-                    : '--'
-                }}
-                <span class="unit">mmHg</span>
-              </div>
-            </div>
-          </ElCol>
-          <ElCol :xs="12" :sm="6">
-            <div class="stat-item">
-              <div class="stat-label">平均血糖</div>
-              <div class="stat-value">
-                {{ statistics.avgBloodSugar ? statistics.avgBloodSugar.toFixed(1) : '--' }}
-                <span class="unit">mmol/L</span>
+                {{ getTrendValue(metric.key)! > 0 ? '+' : '' }}{{ getTrendValue(metric.key)
+                }}{{ metric.unit }}
               </div>
             </div>
           </ElCol>
@@ -72,63 +42,22 @@
       </ElCard>
     </div>
 
-    <!-- 图表展示区域 -->
+    <!-- 图表展示区域（基于配置动态生成） -->
     <ElRow :gutter="20" class="charts-section">
-      <!-- 体重趋势图 -->
-      <ElCol :xs="24" :lg="12">
+      <!-- 动态生成图表 -->
+      <ElCol v-for="metric in chartMetrics" :key="metric.key" :xs="24" :lg="12">
         <div class="card art-custom-card">
           <div class="card-header">
-            <span>体重变化趋势</span>
-            <span class="unit-label">单位: kg</span>
+            <span>{{ metric.label }}变化趋势</span>
+            <span class="unit-label">单位: {{ metric.unit }}</span>
           </div>
           <ArtLineChart
-            v-if="weightChartData.length > 0"
-            :data="weightChartData"
+            v-if="getChartData(metric.key).length > 0"
+            :data="getChartData(metric.key)"
             :xAxisData="dateLabels"
-            :showAreaColor="true"
-            :colors="['#409eff']"
-            symbol="circle"
-            :symbolSize="6"
-            height="300px"
-          />
-          <ElEmpty v-else description="暂无数据" />
-        </div>
-      </ElCol>
-
-      <!-- 血压趋势图 -->
-      <ElCol :xs="24" :lg="12">
-        <div class="card art-custom-card">
-          <div class="card-header">
-            <span>血压变化趋势</span>
-            <span class="unit-label">单位: mmHg</span>
-          </div>
-          <ArtLineChart
-            v-if="bloodPressureChartData.length > 0"
-            :data="bloodPressureChartData"
-            :xAxisData="dateLabels"
-            :showLegend="true"
-            :colors="['#f56c6c', '#67c23a']"
-            symbol="circle"
-            :symbolSize="6"
-            height="300px"
-          />
-          <ElEmpty v-else description="暂无数据" />
-        </div>
-      </ElCol>
-
-      <!-- 血糖趋势图 -->
-      <ElCol :xs="24" :lg="12">
-        <div class="card art-custom-card">
-          <div class="card-header">
-            <span>血糖变化趋势</span>
-            <span class="unit-label">单位: mmol/L</span>
-          </div>
-          <ArtLineChart
-            v-if="bloodSugarChartData.length > 0"
-            :data="bloodSugarChartData"
-            :xAxisData="dateLabels"
-            :showAreaColor="true"
-            :colors="['#e6a23c']"
+            :showAreaColor="!isMultiSeries(metric.key)"
+            :colors="[metric.chartColor || '#409eff']"
+            :showLegend="isMultiSeries(metric.key)"
             symbol="circle"
             :symbolSize="6"
             height="300px"
@@ -152,13 +81,15 @@
               <div v-for="record in displayRecords" :key="record.id" class="record-item">
                 <div class="record-date">{{ formatDate(record.date) }}</div>
                 <div class="record-details">
-                  <span v-if="record.weight">体重: {{ record.weight.toFixed(1) }}kg</span>
-                  <span v-if="record.systolicPressure && record.diastolicPressure">
-                    血压: {{ record.systolicPressure }}/{{ record.diastolicPressure }}mmHg
-                  </span>
-                  <span v-if="record.bloodSugar"
-                    >血糖: {{ record.bloodSugar.toFixed(1) }}mmol/L</span
+                  <!-- 动态显示所有有值的指标 -->
+                  <span
+                    v-for="metric in allMetrics"
+                    :key="metric.key"
+                    v-show="record[metric.key as keyof typeof record] !== undefined"
                   >
+                    {{ metric.label }}:
+                    {{ formatMetricValue(record[metric.key as keyof typeof record], metric) }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -174,11 +105,22 @@
   import type { TimeRangeType, HealthRecord } from '@/types/store/health'
   import type { LineDataItem } from '@/types/component/chart'
   import { useRouter } from 'vue-router'
+  import {
+    getSortedMetrics,
+    getChartMetrics,
+    getStatisticsMetrics,
+    type HealthMetricConfig
+  } from '@/config/health-metrics'
 
   defineOptions({ name: 'HealthStatus' })
 
   const router = useRouter()
   const healthStore = useHealthStore()
+
+  // 获取配置
+  const allMetrics = getSortedMetrics()
+  const chartMetrics = getChartMetrics()
+  const statisticsMetrics = getStatisticsMetrics()
 
   // 时间范围
   const timeRange = ref<TimeRangeType>('30d')
@@ -208,49 +150,93 @@
     })
   })
 
-  // 体重图表数据
-  const weightChartData = computed(() => {
-    const weights = filteredRecords.value
-      .filter((record) => record.weight !== undefined)
-      .map((record) => record.weight!)
+  // 获取统计值（基于配置）
+  const getStatValue = (key: string) => {
+    const avgKey = `avg${key.charAt(0).toUpperCase() + key.slice(1)}`
+    const value = (statistics.value as any)[avgKey]
+    const metric = allMetrics.find((m) => m.key === key)
 
-    return weights.length > 0 ? weights : []
-  })
+    if (value === undefined || value === null) {
+      return '--'
+    }
 
-  // 血压图表数据
-  const bloodPressureChartData = computed((): LineDataItem[] => {
-    const systolicData = filteredRecords.value.map((record) => record.systolicPressure ?? null)
-    const diastolicData = filteredRecords.value.map((record) => record.diastolicPressure ?? null)
+    return metric?.precision !== undefined ? value.toFixed(metric.precision) : value
+  }
 
-    const hasData = systolicData.some((v) => v !== null) || diastolicData.some((v) => v !== null)
+  // 获取趋势值
+  const getTrendValue = (key: string) => {
+    const trendKey = `${key}Trend`
+    const value = (statistics.value as any)[trendKey]
+    const metric = allMetrics.find((m) => m.key === key)
 
-    if (!hasData) return []
+    if (value === undefined || value === null) {
+      return null
+    }
 
-    return [
-      {
-        name: '收缩压',
-        data: systolicData.map((v) => v ?? 0)
-      },
-      {
-        name: '舒张压',
-        data: diastolicData.map((v) => v ?? 0)
+    return metric?.precision !== undefined ? value.toFixed(metric.precision) : value
+  }
+
+  // 判断是否为多系列图表（如血压）
+  const isMultiSeries = (key: string) => {
+    return key === 'bloodPressure' // 特殊处理血压
+  }
+
+  // 获取图表数据（基于配置）
+  const getChartData = (key: string) => {
+    // 特殊处理血压（显示收缩压和舒张压）
+    if (key === 'systolicPressure' || key === 'diastolicPressure') {
+      // 如果是收缩压，返回血压的多系列数据
+      if (key === 'systolicPressure') {
+        const systolicData = filteredRecords.value.map((record) => record.systolicPressure ?? null)
+        const diastolicData = filteredRecords.value.map(
+          (record) => record.diastolicPressure ?? null
+        )
+
+        const hasData =
+          systolicData.some((v) => v !== null) || diastolicData.some((v) => v !== null)
+
+        if (!hasData) return []
+
+        return [
+          {
+            name: '收缩压',
+            data: systolicData.map((v) => v ?? 0)
+          },
+          {
+            name: '舒张压',
+            data: diastolicData.map((v) => v ?? 0)
+          }
+        ] as LineDataItem[]
       }
-    ]
-  })
+      // 舒张压不单独显示图表（已在收缩压图表中）
+      return []
+    }
 
-  // 血糖图表数据
-  const bloodSugarChartData = computed(() => {
-    const bloodSugars = filteredRecords.value
-      .filter((record) => record.bloodSugar !== undefined)
-      .map((record) => record.bloodSugar!)
+    // 其他指标的单系列数据
+    const values = filteredRecords.value
+      .filter((record) => record[key as keyof HealthRecord] !== undefined)
+      .map((record) => record[key as keyof HealthRecord] as number)
 
-    return bloodSugars.length > 0 ? bloodSugars : []
-  })
+    return values.length > 0 ? values : []
+  }
 
   // 显示的最近记录（最多10条）
   const displayRecords = computed<HealthRecord[]>(() => {
     return healthStore.records.slice(0, 10)
   })
+
+  // 格式化指标值
+  const formatMetricValue = (value: any, metric: HealthMetricConfig) => {
+    if (value === undefined || value === null) return ''
+
+    if (metric.type === 'number' && typeof value === 'number') {
+      const formatted =
+        metric.precision !== undefined ? value.toFixed(metric.precision) : value.toString()
+      return `${formatted}${metric.unit}`
+    }
+
+    return `${value}${metric.unit}`
+  }
 
   // 时间范围改变处理
   const handleTimeRangeChange = () => {
@@ -259,7 +245,7 @@
 
   // 跳转到更新页面
   const goToUpdate = () => {
-    router.push('/healthStatus/update')
+    router.push('/health/update')
   }
 
   // 格式化日期

@@ -23,89 +23,40 @@
           />
         </ElFormItem>
 
-        <ElDivider content-position="left">
-          <span class="divider-text">体重信息</span>
-        </ElDivider>
+        <!-- 动态生成健康指标分组 -->
+        <template v-for="(group, groupIndex) in metricGroups" :key="groupIndex">
+          <ElDivider content-position="left">
+            <span class="divider-text">{{ group.title }}</span>
+          </ElDivider>
 
-        <!-- 体重 -->
-        <ElFormItem label="体重" prop="weight">
-          <ElInputNumber
-            v-model="formData.weight"
-            :min="20"
-            :max="300"
-            :precision="1"
-            :step="0.1"
-            placeholder="请输入体重"
-            style="width: 100%"
-          >
-            <template #append>kg</template>
-          </ElInputNumber>
-        </ElFormItem>
-
-        <!-- 体脂率 -->
-        <ElFormItem label="体脂率" prop="bodyFat">
-          <ElInputNumber
-            v-model="formData.bodyFat"
-            :min="1"
-            :max="100"
-            :precision="1"
-            :step="0.1"
-            placeholder="请输入体脂率"
-            style="width: 100%"
-          >
-            <template #append>%</template>
-          </ElInputNumber>
-        </ElFormItem>
-
-        <ElDivider content-position="left">
-          <span class="divider-text">血压信息</span>
-        </ElDivider>
-
-        <!-- 血压 -->
-        <ElFormItem label="收缩压" prop="systolicPressure">
-          <ElInputNumber
-            v-model="formData.systolicPressure"
-            :min="60"
-            :max="250"
-            :precision="0"
-            placeholder="请输入收缩压"
-            style="width: 100%"
-          >
-            <template #append>mmHg</template>
-          </ElInputNumber>
-        </ElFormItem>
-
-        <ElFormItem label="舒张压" prop="diastolicPressure">
-          <ElInputNumber
-            v-model="formData.diastolicPressure"
-            :min="40"
-            :max="150"
-            :precision="0"
-            placeholder="请输入舒张压"
-            style="width: 100%"
-          >
-            <template #append>mmHg</template>
-          </ElInputNumber>
-        </ElFormItem>
-
-        <ElDivider content-position="left">
-          <span class="divider-text">血糖信息</span>
-        </ElDivider>
-
-        <!-- 血糖 -->
-        <ElFormItem label="血糖" prop="bloodSugar">
-          <ElInputNumber
-            v-model="formData.bloodSugar"
-            :min="1"
-            :max="30"
-            :precision="1"
-            :step="0.1"
-            placeholder="请输入血糖"
-            style="width: 100%"
-          >
-            <template #append>mmol/L</template>
-          </ElInputNumber>
-        </ElFormItem>
+          <!-- 动态生成表单项 -->
+          <template v-for="metric in group.metrics" :key="metric.key">
+            <ElFormItem :label="metric.label" :prop="metric.key">
+              <ElInputNumber
+                v-if="metric.type === 'number'"
+                v-model="(formData as any)[metric.key]"
+                :min="metric.min"
+                :max="metric.max"
+                :precision="metric.precision"
+                :step="metric.precision ? 0.1 : 1"
+                :placeholder="metric.placeholder"
+                style="width: 100%"
+              >
+                <template #append>{{ metric.unit }}</template>
+              </ElInputNumber>
+              <ElInput
+                v-else-if="metric.type === 'string'"
+                v-model="(formData as any)[metric.key]"
+                :placeholder="metric.placeholder"
+              />
+              <!-- 显示正常范围提示 -->
+              <div v-if="metric.normalRange" class="range-hint">
+                正常范围: {{ metric.normalRange.min }} - {{ metric.normalRange.max }}
+                {{ metric.unit }}
+              </div>
+            </ElFormItem>
+          </template>
+        </template>
 
         <ElDivider content-position="left">
           <span class="divider-text">备注</span>
@@ -143,7 +94,7 @@
       </ElForm>
     </ElCard>
 
-    <!-- 健康指标参考卡片 -->
+    <!-- 健康指标参考卡片（基于配置自动生成） -->
     <ElCard class="reference-card">
       <template #header>
         <div class="card-header">
@@ -153,31 +104,20 @@
       </template>
 
       <ElRow :gutter="20">
-        <ElCol :xs="24" :sm="12" :md="8">
+        <ElCol v-for="metric in metricsWithNormalRange" :key="metric.key" :xs="24" :sm="12" :md="8">
           <div class="reference-item">
-            <h4>体重（BMI）</h4>
-            <p>正常: 18.5-23.9</p>
-            <p>偏瘦: &lt;18.5</p>
-            <p>超重: 24-27.9</p>
-            <p>肥胖: ≥28</p>
-          </div>
-        </ElCol>
-
-        <ElCol :xs="24" :sm="12" :md="8">
-          <div class="reference-item">
-            <h4>血压</h4>
-            <p>正常: 收缩压 &lt;120，舒张压 &lt;80</p>
-            <p>正常高值: 收缩压 120-139，舒张压 80-89</p>
-            <p>高血压: 收缩压 ≥140，舒张压 ≥90</p>
-          </div>
-        </ElCol>
-
-        <ElCol :xs="24" :sm="12" :md="8">
-          <div class="reference-item">
-            <h4>血糖</h4>
-            <p>空腹正常: 3.9-6.1 mmol/L</p>
-            <p>餐后2h正常: &lt;7.8 mmol/L</p>
-            <p>糖尿病: 空腹 ≥7.0 或餐后2h ≥11.1</p>
+            <h4>{{ metric.label }}（{{ metric.unit }}）</h4>
+            <p v-if="metric.normalRange">
+              <strong>正常范围:</strong> {{ metric.normalRange.min }} -
+              {{ metric.normalRange.max }}
+            </p>
+            <p v-if="metric.normalRange?.description" class="description">
+              {{ metric.normalRange.description }}
+            </p>
+            <p v-if="metric.description" class="tip">
+              <ElIcon><InfoFilled /></ElIcon>
+              {{ metric.description }}
+            </p>
           </div>
         </ElCol>
       </ElRow>
@@ -190,6 +130,11 @@
   import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
   import { DocumentAdd, RefreshLeft, Back, InfoFilled } from '@element-plus/icons-vue'
   import { useRouter } from 'vue-router'
+  import {
+    getSortedMetrics,
+    validateMetricValue,
+    type HealthMetricConfig
+  } from '@/config/health-metrics'
 
   defineOptions({ name: 'HealthUpdate' })
 
@@ -197,73 +142,137 @@
   const healthStore = useHealthStore()
   const formRef = ref<FormInstance>()
 
-  // 表单数据
-  const formData = reactive({
+  // 获取所有健康指标配置
+  const allMetrics = getSortedMetrics()
+
+  // 按类别分组指标（根据 sortOrder 自动分组）
+  const metricGroups = computed(() => {
+    const groups: Array<{ title: string; metrics: HealthMetricConfig[] }> = []
+
+    // 根据 sortOrder 分组
+    const weightMetrics = allMetrics.filter((m) => m.sortOrder === 1)
+    const pressureMetrics = allMetrics.filter((m) => m.sortOrder === 2 || m.sortOrder === 3)
+    const sugarMetrics = allMetrics.filter((m) => m.sortOrder === 4)
+    const otherMetrics = allMetrics.filter((m) => m.sortOrder && m.sortOrder >= 5)
+
+    if (weightMetrics.length > 0) {
+      groups.push({ title: '体重信息', metrics: weightMetrics })
+    }
+    if (pressureMetrics.length > 0) {
+      groups.push({ title: '血压信息', metrics: pressureMetrics })
+    }
+    if (sugarMetrics.length > 0) {
+      groups.push({ title: '血糖信息', metrics: sugarMetrics })
+    }
+    if (otherMetrics.length > 0) {
+      groups.push({ title: '其他指标', metrics: otherMetrics })
+    }
+
+    return groups
+  })
+
+  // 有正常范围的指标（用于参考卡片）
+  const metricsWithNormalRange = computed(() => {
+    return allMetrics.filter((m) => m.normalRange)
+  })
+
+  // 表单数据（动态初始化）
+  const formData = reactive<Record<string, any>>({
     date: new Date().toISOString(),
-    weight: undefined as number | undefined,
-    bodyFat: undefined as number | undefined,
-    systolicPressure: undefined as number | undefined,
-    diastolicPressure: undefined as number | undefined,
-    bloodSugar: undefined as number | undefined,
     note: ''
   })
 
-  // 表单验证规则
-  const rules: FormRules = {
-    date: [{ required: true, message: '请选择记录时间', trigger: 'change' }],
-    weight: [
-      {
-        validator: (rule, value, callback) => {
-          if (value === undefined || value === null) {
-            callback()
-            return
-          }
-          if (value < 20 || value > 300) {
-            callback(new Error('体重应在20-300kg之间'))
-          } else {
-            callback()
-          }
-        },
-        trigger: 'blur'
+  // 动态生成表单验证规则
+  const rules = computed<FormRules>(() => {
+    const ruleMap: Record<string, any[]> = {
+      date: [{ required: true, message: '请选择记录时间', trigger: 'change' }]
+    }
+
+    // 为每个指标生成验证规则
+    allMetrics.forEach((metric) => {
+      const metricRules: any[] = []
+
+      // 必填验证
+      if (metric.required) {
+        metricRules.push({
+          required: true,
+          message: `请输入${metric.label}`,
+          trigger: 'blur'
+        })
       }
-    ],
-    systolicPressure: [
-      {
-        validator: (rule, value, callback) => {
-          if (value !== undefined && formData.diastolicPressure === undefined) {
-            callback(new Error('请同时填写舒张压'))
-          } else if (
-            value !== undefined &&
-            formData.diastolicPressure !== undefined &&
-            value <= formData.diastolicPressure
-          ) {
-            callback(new Error('收缩压应大于舒张压'))
-          } else {
-            callback()
-          }
-        },
-        trigger: 'blur'
+
+      // 范围验证
+      if (metric.type === 'number') {
+        metricRules.push({
+          validator: (rule: any, value: any, callback: any) => {
+            if (value === undefined || value === null) {
+              callback()
+              return
+            }
+            const result = validateMetricValue(metric.key, value)
+            if (!result.valid) {
+              callback(new Error(result.message))
+            } else {
+              callback()
+            }
+          },
+          trigger: 'blur'
+        })
       }
-    ],
-    diastolicPressure: [
-      {
-        validator: (rule, value, callback) => {
-          if (value !== undefined && formData.systolicPressure === undefined) {
-            callback(new Error('请同时填写收缩压'))
-          } else if (
-            value !== undefined &&
-            formData.systolicPressure !== undefined &&
-            value >= formData.systolicPressure
-          ) {
-            callback(new Error('舒张压应小于收缩压'))
-          } else {
-            callback()
-          }
-        },
-        trigger: 'blur'
-      }
-    ]
-  }
+
+      ruleMap[metric.key] = metricRules
+    })
+
+    // 添加血压特殊验证
+    const systolicPressure = allMetrics.find((m) => m.key === 'systolicPressure')
+    const diastolicPressure = allMetrics.find((m) => m.key === 'diastolicPressure')
+
+    if (systolicPressure) {
+      ruleMap.systolicPressure = [
+        ...(ruleMap.systolicPressure || []),
+        {
+          validator: (rule: any, value: any, callback: any) => {
+            if (value !== undefined && formData.diastolicPressure === undefined) {
+              callback(new Error('请同时填写舒张压'))
+            } else if (
+              value !== undefined &&
+              formData.diastolicPressure !== undefined &&
+              value <= formData.diastolicPressure
+            ) {
+              callback(new Error('收缩压应大于舒张压'))
+            } else {
+              callback()
+            }
+          },
+          trigger: 'blur'
+        }
+      ]
+    }
+
+    if (diastolicPressure) {
+      ruleMap.diastolicPressure = [
+        ...(ruleMap.diastolicPressure || []),
+        {
+          validator: (rule: any, value: any, callback: any) => {
+            if (value !== undefined && formData.systolicPressure === undefined) {
+              callback(new Error('请同时填写收缩压'))
+            } else if (
+              value !== undefined &&
+              formData.systolicPressure !== undefined &&
+              value >= formData.systolicPressure
+            ) {
+              callback(new Error('舒张压应小于收缩压'))
+            } else {
+              callback()
+            }
+          },
+          trigger: 'blur'
+        }
+      ]
+    }
+
+    return ruleMap
+  })
 
   // 禁用未来日期
   const disabledDate = (time: Date) => {
@@ -277,28 +286,30 @@
     await formRef.value.validate((valid) => {
       if (valid) {
         // 检查是否至少填写了一项健康数据
-        const hasData =
-          formData.weight !== undefined ||
-          formData.bodyFat !== undefined ||
-          formData.systolicPressure !== undefined ||
-          formData.diastolicPressure !== undefined ||
-          formData.bloodSugar !== undefined
+        const hasData = allMetrics.some((metric) => {
+          const value = formData[metric.key]
+          return value !== undefined && value !== null && value !== ''
+        })
 
         if (!hasData) {
           ElMessage.warning('请至少填写一项健康数据')
           return
         }
 
-        // 保存数据
-        healthStore.addRecord({
+        // 构建保存数据（只包含有值的字段）
+        const recordData: Record<string, any> = {
           date: formData.date,
-          weight: formData.weight,
-          bodyFat: formData.bodyFat,
-          systolicPressure: formData.systolicPressure,
-          diastolicPressure: formData.diastolicPressure,
-          bloodSugar: formData.bloodSugar,
           note: formData.note || undefined
+        }
+
+        allMetrics.forEach((metric) => {
+          if (formData[metric.key] !== undefined && formData[metric.key] !== null) {
+            recordData[metric.key] = formData[metric.key]
+          }
         })
+
+        // 保存数据
+        healthStore.addRecord(recordData)
 
         ElMessage.success('健康数据保存成功')
 
@@ -319,12 +330,12 @@
   const handleReset = () => {
     formRef.value?.resetFields()
     formData.date = new Date().toISOString()
-    formData.weight = undefined
-    formData.bodyFat = undefined
-    formData.systolicPressure = undefined
-    formData.diastolicPressure = undefined
-    formData.bloodSugar = undefined
     formData.note = ''
+
+    // 清空所有健康指标字段
+    allMetrics.forEach((metric) => {
+      delete formData[metric.key]
+    })
   }
 
   // 返回
